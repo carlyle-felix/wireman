@@ -6,8 +6,8 @@
 
 #include "../incl/root.h"
 
-int euid_helper(Euid_ops option) {
-    
+int euid_helper(Euid_ops option) 
+{    
     int res;
 	struct passwd *pw;
 	uid_t uid;

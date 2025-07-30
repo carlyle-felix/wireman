@@ -5,18 +5,18 @@
 
 #define CURL_IP "https://api.ipify.org/"
 
-size_t write_callback(char *ptr, size_t size, size_t nmemb, void *data);
-
 struct memory {
   char *response;
   size_t size;
 };
 
+size_t write_callback(char *p, size_t size, size_t nmemb, void *data);
+
 char *curl_ip(void)
 {
     CURL *curl = curl_easy_init();
     struct memory *mem = {0};
-    char *str;
+    char *s;
 
     if (curl) {
         CURLcode res;
@@ -30,26 +30,31 @@ char *curl_ip(void)
             return NULL;
         }
 
-        str = malloc(16);
-        str = strcpy(mem->response, str);
-        free(mem->response);
+        s = malloc(16);
+        if (!s) {
+            printf("error: failed to allocate memory in curl_ip().\n");
+        } else {
+            strcpy(s, mem->response);
+            free(mem->response);
+        }
+
         curl_easy_cleanup(curl);
     }
 
-    return str;
+    return s;
 }
 
-size_t write_callback(char *ptr, size_t size, size_t nmemb, void *data)
+size_t write_callback(char *p, size_t size, size_t nmemb, void *data)
 {
     size_t realsize = size * nmemb;
     struct memory *mem = (struct memory *)data;
  
-    ptr = realloc(mem->response, mem->size + realsize + 1);
-    if (!ptr) {
+    p = realloc(mem->response, mem->size + realsize + 1);
+    if (!p) {
         return 0;
     }
 
-    mem->response = ptr;
+    mem->response = p;
     memcpy(&(mem->response[mem->size]), data, realsize);
     mem->size += realsize;
     mem->response[mem->size] = 0;
