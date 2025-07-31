@@ -3,6 +3,8 @@
 #include <string.h>
 #include <curl/curl.h>
 
+#include "../incl/hostip.h"
+
 #define CURL_IP "https://api.ipify.org/"
 
 struct memory {
@@ -30,7 +32,7 @@ char *curl_ip(void)
             return NULL;
         }
 
-        s = malloc(16);
+        s = malloc(IP_LEN + 1);
         if (!s) {
             printf("error: failed to allocate memory in curl_ip().\n");
         } else {
