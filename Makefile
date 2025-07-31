@@ -18,7 +18,7 @@ server.o: ${SRC}/server.c ${INCL}/hostip.h ${INCL}/server.h ${INCL}/manager.h ${
 hostip.o: ${SRC}/hostip.c ${INCL}/hostip.h
 	gcc -c ${SRC}/hostip.c
 
-manager.o: ${SRC}/manager.c ${INCL}/manager.h
+manager.o: ${SRC}/manager.c ${INCL}/manager.h ${INCL}/root.h
 	gcc -c ${SRC}/manager.c
 
 wireguard.o: ${SRC}/wireguard.c ${INCL}/wireguard.h

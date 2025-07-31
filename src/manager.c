@@ -3,10 +3,10 @@
 #include <string.h>
 
 #include "../incl/manager.h"
+#include "../incl/root.h"
 
 struct config {
-    char *host;
-    char *peer;
+    char *address;
     char *key;
     char *pub;
     char *psk;
@@ -20,8 +20,7 @@ Config new_config(void)
     if (!p) {
         printf("error: failed to allocate memory for new config structure.\n");
     }
-    p->host = NULL;
-    p->peer = NULL;
+    p->address = NULL;
     p->key = NULL;
     p->pub = NULL;
     p->psk = NULL;
@@ -33,8 +32,7 @@ Config new_config(void)
 
 void clear_config(Config p)
 {
-    free(p->host);
-    free(p->peer);
+    free(p->address);
     free(p->key);
     free(p->pub);
     free(p->psk);
@@ -53,21 +51,19 @@ int add_key(Config conf, Field key, char *s)
     strcpy(p, s);
 
     switch (key) {
-        case HOST:              conf->host = p;
-                                break;
-        case PEER:              conf->peer = p;
-                                break;
-        case KEY:               conf->key = p;
-                                break;
-        case PUB:               conf->pub = p;
-                                break;
-        case PSK:               conf->psk = p;
-                                break;
-        case PORT:              conf->port = p;
-                                break;
-        case ALLOW:             conf->allow = p;
-                                break;
-        default:                break;     
+        case ADDRESS:   conf->address = p;
+                        break;
+        case KEY:       conf->key = p;
+                        break;
+        case PUB:       conf->pub = p;
+                        break;
+        case PSK:       conf->psk = p;
+                        break;
+        case PORT:      conf->port = p;
+                        break;
+        case ALLOW:     conf->allow = p;
+                        break;
+        default:        break;     
     }
 
     return 0;
@@ -78,14 +74,41 @@ write data to configs for specified interface
 Field:  HOST
         SERVER
 */
-int write_config(Config conf, Field dev, char *interface)
+int write_host(Config host, char *interface)
 {
-    // write data to /etc/wireguard/<interface>.conf for host
-    // write data to ~/.conf/wireman/<interface>.conf for peer and create entry in host
+    FILE *fp;
+    char *path = malloc(strlen(interface) + 21);        // additional chars in path = 20
+    
+    if (!path) {
+        printf("error: failed to allocate memory for path\n");
+        return 1;
+    }
+    sprintf(path, "/etc/wireguard/%s.conf", interface);
 
+    euid_helper(GAIN);      // gain root
+    fp = fopen(path, "w");
+    euid_helper(DROP);      // drop root
+    if (!fp) {
+        printf("error: failed to open %s\n", path);
+        free(path);
+        return 1;
+    }
+
+    fprintf(fp, "[Interface]\n");
+    fprintf(fp, "PrivateKey = %s\n", host->key);
+    fprintf(fp, "Address = %s\n", host->address);
+    fprintf(fp, "ListenPort = %s\n", host->port);
+
+    free(path);
+    fclose(fp);
+    
     return 0;
 }
 
+int write_peer(Config peer, char *interface) {
+    // write configs to ~/.config/wireman/<interface>/<interface.conf>
+    // add [Peer] to host
+}
 /*
 delete specified interface config, and remove entries peer entries from host if dev is PEER.
 Field:  HOST

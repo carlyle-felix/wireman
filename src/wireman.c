@@ -16,22 +16,24 @@ int main(int argc, char *argv[])
     // read args: new server, new peer, remove server, remove peer
     if (argc == 1) {
         printf("use --help for list of operations.\n");
-    } else if (!strcmp(argv[1], "--add-server")) {
-        /*
+    } else if (!strcmp(argv[1], "--add-host")) {
         if (user_id != 0) {
             printf("error: operation requires elevated privilage.\n");
             return user_id;
         } 
-        */ 
-        add_server(argv[2]);
-    } else if (!strcmp(argv[1], "--del-server")) {
-        /*
+         
+        add_host(argv[2]);
+    } else if (!strcmp(argv[1], "--del-host")) {        // interface should be turned off first.
         if (user_id != 0) {
             printf("error: operation requires elevated privilage.\n");
             return user_id;
         }
-        */
-        del_server(argv[2]);
+        
+        del_host(argv[2]);
+    } else if (!strcmp(argv[1], "--add-peer")) {
+        add_peer(argv[2]);
+    } else if (!strcmp(argv[1], "--del-peer")) {
+        del_peer(argv[2]);
     }
 
     return 0;

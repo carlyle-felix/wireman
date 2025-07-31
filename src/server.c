@@ -15,13 +15,14 @@
 collect hostname, key, pub and port.
 collect public ip and store it somewhere for later use during peer setup.
 */
-int add_server(char *interface) 
+int add_host(char *interface) 
 {
     Config conf = new_config();
     char c, port[UDP_LEN + 1] = DEFAULT_UDP, ip[IP_LEN + 1] = DEFAULT_ADDRESS;
     int i, res;
     wg_key key, pub;
     wg_key_b64_string key_base64, pub_base64;
+    FILE *fp;
 
     printf("info: creating new server \"%s\"\n", interface);
 
@@ -50,7 +51,7 @@ int add_server(char *interface)
     for (i = 0; (c = getchar()) != '\n'; i++) {
         ip[i] = c;
     }
-    res = add_key(conf, HOST, ip);
+    res = add_key(conf, ADDRESS, ip);
     if (res) {
         clear_config(conf);
         return res;
@@ -72,12 +73,12 @@ int add_server(char *interface)
     printf("listening port: %s\n", port);
 
 
-    write_config(conf, HOST, interface);
+    write_host(conf, interface);
     clear_config(conf);
     return 0;
 }
 
-int del_server(char *interface) 
+int del_host(char *interface) 
 {
     printf("info: removing server \"%s\"\n", interface);
 

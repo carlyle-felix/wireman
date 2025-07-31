@@ -2,8 +2,7 @@
 #define MANAGER_H
 
 /*
-Conf keys:  host (ipv4)
-            peer (ipv4)
+Conf keys:  address (ipv4)
             key
             pub
             psk
@@ -11,12 +10,13 @@ Conf keys:  host (ipv4)
             allow (ip)
 */
 typedef struct config *Config;
-typedef enum f {HOST, PEER, KEY, PUB, PSK, PORT, ALLOW} Field;
+typedef enum f {ADDRESS, KEY, PUB, PSK, PORT, ALLOW} Field;
 // enum device {SERVER_HOST, SERVER_PEER};
 
 Config new_config(void);
 void clear_config(Config p);
-int write_config(Config conf, Field dev, char *interface);
+int write_host(Config conf, char *interface);
+int write_peer(Config conf, char *interface);
 int delete_config(Field dev, char *interface);
 int add_key(Config conf, Field key, char *s);
 
