@@ -3,6 +3,7 @@
 
 #include "../incl/root.h"
 #include "../incl/server.h"
+#include "../incl/util.h"
 
 int main(int argc, char *argv[]) 
 {
@@ -12,6 +13,8 @@ int main(int argc, char *argv[])
     if (!user_id) {
         euid_helper(DROP);      // drop euid root before proceeding.
     }
+
+    config_home();
     
     // read args: new server, new peer, remove server, remove peer
     if (argc == 1) {

@@ -6,6 +6,7 @@
 #include "../incl/hostip.h"
 #include "../incl/manager.h"
 #include "../incl/wireguard.h"
+#include "../incl/util.h"
 
 #define UDP_LEN 5
 #define DEFAULT_UDP "51820"
@@ -22,7 +23,6 @@ int add_host(char *interface)
     int i, res;
     wg_key key, pub;
     wg_key_b64_string key_base64, pub_base64;
-    FILE *fp;
 
     printf("info: creating new server \"%s\"\n", interface);
 
@@ -72,6 +72,8 @@ int add_host(char *interface)
     printf("address: %s\n", ip);
     printf("listening port: %s\n", port);
 
+    store_key(interface, "key", key_base64);
+    store_key(interface, "pub", pub_base64);
 
     write_host(conf, interface);
     clear_config(conf);

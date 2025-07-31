@@ -4,6 +4,7 @@
 
 #include "../incl/manager.h"
 #include "../incl/root.h"
+#include "../incl/util.h"
 
 struct config {
     char *address;
@@ -76,36 +77,37 @@ Field:  HOST
 */
 int write_host(Config host, char *interface)
 {
-    FILE *fp;
+    FILE *f;
     char *path = malloc(strlen(interface) + 21);        // additional chars in path = 20
     
     if (!path) {
         printf("error: failed to allocate memory for path\n");
         return 1;
     }
-    sprintf(path, "/etc/wireguard/%s.conf", interface);
+    sprintf(path, HOST_CONFIG, interface);
 
     euid_helper(GAIN);      // gain root
-    fp = fopen(path, "w");
+    f = fopen(path, "w");
     euid_helper(DROP);      // drop root
-    if (!fp) {
+    if (!f) {
         printf("error: failed to open %s\n", path);
         free(path);
         return 1;
     }
 
-    fprintf(fp, "[Interface]\n");
-    fprintf(fp, "PrivateKey = %s\n", host->key);
-    fprintf(fp, "Address = %s\n", host->address);
-    fprintf(fp, "ListenPort = %s\n", host->port);
+    fprintf(f, "[Interface]\n");
+    fprintf(f, "PrivateKey = %s\n", host->key);
+    fprintf(f, "Address = %s\n", host->address);
+    fprintf(f, "ListenPort = %s\n", host->port);
 
     free(path);
-    fclose(fp);
+    fclose(f);
     
     return 0;
 }
 
-int write_peer(Config peer, char *interface) {
+int write_peer(Config peer, char *interface) 
+{
     // write configs to ~/.config/wireman/<interface>/<interface.conf>
     // add [Peer] to host
 }
