@@ -7,7 +7,7 @@
 
 #include "../incl/util.h"
 
-Path *home, *wireman, *wireguard;
+Path *home, *wireman;
 
 int config_home(void)
 {
@@ -27,8 +27,6 @@ int config_home(void)
     if (!is_dir(wireman)) {
         mkdir(wireman, 0777);
     } 
-
-    wireguard = ETC_WIREGUARD;
 
     return 0;
 }
