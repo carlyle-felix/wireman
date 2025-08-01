@@ -134,7 +134,7 @@ int keygen(Config conf, char *interface)
     }
 
     // preshared key
-    wg_key_to_base64(psk_base64, pub);
+    wg_key_to_base64(psk_base64, psk);
     res = add_key(conf, PSK, psk_base64);
     if (res) {
         printf("error: failed to add psk.\n");
