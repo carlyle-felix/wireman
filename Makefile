@@ -24,5 +24,5 @@ manager.o: ${SRC}/manager.c ${INCL}/manager.h ${INCL}/root.h ${INCL}/util.h
 wireguard.o: ${SRC}/wireguard.c ${INCL}/wireguard.h
 	gcc -c ${SRC}/wireguard.c
 
-util.o: ${SRC}/util.c ${INCL}/util.h
+util.o: ${SRC}/util.c ${INCL}/util.h ${INCL}/manager.h
 	gcc -c ${SRC}/util.c
