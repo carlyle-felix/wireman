@@ -7,59 +7,91 @@
 
 #define CURL_IP "https://api.ipify.org/"
 
-struct memory {
+typedef struct {
   char *response;
   size_t size;
-};
+} Memory;
 
-size_t write_callback(char *p, size_t size, size_t nmemb, void *data);
+char *curl(Memory *buffer);
+size_t write_callback(char *data, size_t size, size_t nmemb, Memory *p);
 
-char *curl_ip(void)
+char *host_ip(void)
 {
-    CURL *curl = curl_easy_init();
-    struct memory *mem = {0};
-    char *s;
+    Memory *buffer;
+    char *ip = NULL;
+
+    buffer = malloc(sizeof(Memory));
+    if (!buffer) {
+        printf("error: failed to allocate memory for public ip buffer.\n");
+        return NULL;
+    }
+    
+    buffer->response = malloc(sizeof(char));
+    if (!buffer->response) {
+        printf("error: failed to allocate memory for response buffer.\n");
+        return NULL;
+    }
+    buffer->size = 0;
+    
+    curl(buffer);
+    
+    ip = malloc(strlen(buffer->response) + 1);
+    if (!ip) {
+        printf("error: failed to allocate memory for public IP return variable.\n");
+        return NULL;
+    }
+    strcpy(ip, buffer->response);
+
+    free(buffer->response);
+    free(buffer);
+
+    printf("\ninfo: retrieved public IP: %s\n\n", ip);
+    
+    return ip;
+}
+/*
+returns host public ip retrieved from api.ipify.org.
+NOTE: caller must free returned pointer.
+*/
+char *curl(Memory *buffer)
+{
+    CURL *curl;
+
+    curl_global_init(CURL_GLOBAL_ALL);
+    curl = curl_easy_init();
 
     if (curl) {
         CURLcode res;
         
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&mem);
         curl_easy_setopt(curl, CURLOPT_URL, CURL_IP);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, buffer);
         
         res = curl_easy_perform(curl);
         if (res) {
+            printf("error: failed to retrieve public IP.\n");
             return NULL;
         }
 
-        s = malloc(IP_LEN + 1);
-        if (!s) {
-            printf("error: failed to allocate memory in curl_ip().\n");
-        } else {
-            strcpy(s, mem->response);
-            free(mem->response);
-        }
-
         curl_easy_cleanup(curl);
+        curl_global_cleanup();
     }
-
-    return s;
+    return buffer->response;
 }
 
-size_t write_callback(char *p, size_t size, size_t nmemb, void *data)
+size_t write_callback(char *data, size_t size, size_t nmemb, Memory *buffer)
 {
     size_t realsize = size * nmemb;
-    struct memory *mem = (struct memory *)data;
+    Memory *mem = buffer;
  
-    p = realloc(mem->response, mem->size + realsize + 1);
-    if (!p) {
+    mem->response = realloc(mem->response, mem->size + realsize + 1);
+    if (!mem->response) {
         return 0;
     }
 
-    mem->response = p;
     memcpy(&(mem->response[mem->size]), data, realsize);
     mem->size += realsize;
-    mem->response[mem->size] = 0;
+    mem->response[mem->size] = '\0';
  
     return realsize;
 }

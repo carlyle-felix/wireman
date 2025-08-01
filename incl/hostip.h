@@ -3,6 +3,6 @@
 
 #define IP_LEN 15
 
-char *curl_ip(void);
+char *host_ip(void);
 
 #endif

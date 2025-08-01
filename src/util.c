@@ -7,7 +7,7 @@
 
 #include "../incl/util.h"
 
-Path *home, *wireman;
+Path *home, *wireman, *wireguard;
 
 int config_home(void)
 {
@@ -21,12 +21,14 @@ int config_home(void)
         return 1;
     }
     strcpy(p, home);
-    wireman = strcat(p, "/.config/wireman/");       // initialize global wireman path.
+    wireman = strcat(p, CONFIG_WIREMAN);       // initialize global wireman path.
 
     // create ~/.config/wireman if it doesn't exist.
     if (!is_dir(wireman)) {
         mkdir(wireman, 0777);
     } 
+
+    wireguard = ETC_WIREGUARD;
 
     return 0;
 }
@@ -79,7 +81,6 @@ int store_key(char *key_name, char *key_type, char *key)
     Path *p;
     FILE *f;
     char *filename;
-    int res;
 
     // check for ~/.config/wireman/<key_name>, create if doesn't exist.
     p = config_path(key_name);
@@ -110,4 +111,60 @@ int store_key(char *key_name, char *key_type, char *key)
     fclose(f);
 
     return 0;
+}
+
+/*
+copy contents of old <host_interface>.conf into new
+NOTE: caller must close returned file.
+*/
+FILE *file_copy(char *interface)
+{
+    FILE *old_file, *new_file;
+    Path *old_conf, *new_conf, *temp_conf;
+    char buffer[MAX_BUFFER];
+
+    old_conf = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
+    if (!old_conf) {
+        printf("error: failed to allocate memory for old file pointer\n");
+        return NULL;
+    }
+    sprintf(old_conf, ETC_WIREGUARD_CONF, interface);
+
+    temp_conf = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 4);
+    if (!temp_conf) {
+        printf("error: failed to allocate memory for temp file pointer\n");
+        return NULL;
+    }
+    sprintf(temp_conf, ETC_WIREGUARD_CONF".old", interface);
+
+    rename(old_conf, temp_conf);
+    remove(old_conf); 
+    free(old_conf);
+
+    old_file = fopen(temp_conf, "r");
+    if (!old_file) {
+        printf("error: unable to open old %s.conf\n", interface);
+        return NULL;
+    }
+
+    new_conf = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
+    if (!new_conf) {
+        printf("error: failed to allocate memory for new file pointer\n");
+        return NULL;
+    }
+    sprintf(new_conf, ETC_WIREGUARD_CONF, interface);
+
+    new_file = fopen(new_conf, "w");
+    if (!new_file) {
+        printf("error: unable to open old %s.conf", interface);
+        return NULL;
+    }
+    free(new_conf);
+
+    while (fgets(buffer, MAX_BUFFER, old_file)) {
+        fprintf(new_file, buffer);
+    }
+    fclose(old_file);
+
+    return new_file;
 }
