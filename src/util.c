@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "../incl/util.h"
+#include "../incl/manager.h"
 
 Path *home, *wireman;
 
@@ -165,4 +166,61 @@ FILE *file_copy(char *interface)
     fclose(old_file);
 
     return new_file;
+}
+
+/*
+read keys from ~/.config/wireman/<interface>/<interface>.<type>
+Keys:   BASE64KEY
+        BASE64PUB
+        BASE64BASE
+NOTE: caller must free return value.
+*/
+char *read_key(char *interface, Key type)
+{
+    FILE *f;
+    Path *temp, *p;
+    char c, *value, buffer[MAX_BUFFER];
+    int i;
+
+    temp = config_path(interface);
+    p = malloc(strlen(temp) + strlen(interface) + 6);
+    if (!p) {
+        printf("error: failed to allocate memory for path in read_key().\n");
+        free(temp);
+        return NULL;
+    }
+
+    switch (type) {
+
+        case BASE64KEY:     sprintf(p, "%s/%s.key", temp, interface);
+                            break;
+        case BASE64PUB:     sprintf(p, "%s/%s.pub", temp, interface);
+                            break;
+        case BASE64PSK:     sprintf(p, "%s/%s.psk", temp, interface);
+                            break;
+        default:            break;
+    }
+    free(temp);
+
+    f = fopen(p, "r");
+    if (!f) {
+        printf("error: failed to open %s", p);
+        free(p);
+        return NULL;
+    }
+    free(p);
+
+    for (i = 0; (c = fgetc(f)) != EOF; i++) {
+        buffer[i] = c;
+    }   
+    buffer[i] = '\0';
+
+    value = malloc(strlen(buffer) + 1);
+    if (!value) {
+        printf("error: unable to allocate memory for return value in read_key().\n");
+        return NULL;
+    }
+    strcpy(value, buffer);
+
+    return value;
 }
