@@ -3,6 +3,7 @@
 
 #include "../incl/root.h"
 #include "../incl/interface.h"
+#include "../incl/manager.h"
 #include "../incl/util.h"
 
 int main(int argc, char *argv[]) 
@@ -20,6 +21,7 @@ int main(int argc, char *argv[])
     if (argc == 1) {
         printf("use --help for list of operations.\n");
     } else if (!strcmp(argv[1], "--add-host")) {
+        
         if (user_id != 0) {
             printf("error: operation requires elevated privilage.\n");
             return user_id;
@@ -27,13 +29,23 @@ int main(int argc, char *argv[])
          
         add_host(argv[2]);
     } else if (!strcmp(argv[1], "--host")) {
+        
         if (user_id != 0) {
             printf("error: operation requires elevated privilage.\n");
             return user_id;
         } 
+        
         if (!strcmp(argv[3], "--add-peer")) {
             add_peer(argv[2], argv[4]);
         }
+    } else if (!strcmp(argv[1], "--del-host")) {
+
+        if (user_id != 0) {
+            printf("error: operation requires elevated privilage.\n");
+            return user_id;
+        } 
+
+
     }
 
     return 0;

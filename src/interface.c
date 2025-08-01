@@ -5,14 +5,9 @@
 #include "../incl/interface.h"
 #include "../incl/hostip.h"
 #include "../incl/manager.h"
-#include "../incl/wireguard.h"
-#include "../incl/util.h"
 
 #define UDP_LEN 5
 #define DEFAULT_UDP "51820"
-
-int keygen(Config conf, char *interface);
-int tunnel_address(Config conf);
 
 /*
 collect hostname, key, pub and port.
@@ -101,73 +96,4 @@ int add_peer(char *host, char *peer)
     write_config(conf, PEER, host, peer);
     clear_config(conf);
     return 0;
-}
-
-int keygen(Config conf, char *interface)
-{
-    wg_key key, pub, psk;
-    wg_key_b64_string key_base64, pub_base64, psk_base64;
-    int res;
-
-    // generate keys
-    wg_generate_private_key(key);
-    wg_generate_public_key(pub, key);
-    wg_generate_preshared_key(psk);
-    
-    // private key
-    wg_key_to_base64(key_base64, key);
-    res = add_key(conf, KEY, key_base64);
-    if (res) {
-        printf("error: failed to add key.\n");
-        clear_config(conf);
-        return res;
-    }
-
-    // public key
-    wg_key_to_base64(pub_base64, pub);
-    res = add_key(conf, PUB, pub_base64);
-    if (res) {
-        printf("error: failed to add pub.\n");
-        clear_config(conf);
-        return res;
-    }
-
-    // preshared key
-    wg_key_to_base64(psk_base64, psk);
-    res = add_key(conf, PSK, psk_base64);
-    if (res) {
-        printf("error: failed to add psk.\n");
-        clear_config(conf);
-        return res;
-    }
-
-    store_key(interface, "key", key_base64);        // TODO: only store this on demand.
-    store_key(interface, "pub", pub_base64);
-    store_key(interface, "psk", psk_base64);
-
-    printf("\nkey: %s\npub: %s\npsk: %s\n\n", key_base64, pub_base64, psk_base64);         // delete this line.
-
-    return res;
-}
-
-int tunnel_address(Config conf)
-{
-    int i, res;
-    char c, ip[IP_LEN + 1];     // TODO: find defaults.
-
-    printf("Input tunnel address (default 10.0.0.X/24): ");
-    for (i = 0; (c = getchar()) != '\n'; i++) {
-        ip[i] = c;
-    }
-
-    // add host ip to conf
-    res = add_key(conf, ADDRESS, ip);
-    if (res) {
-        printf("error: failed to add tunnel address.\n");
-        clear_config(conf);
-        return res;
-    }
-    printf("tunnel address: %s\n", ip);
-
-    return res;
 }
