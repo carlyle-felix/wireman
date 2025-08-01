@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../incl/server.h"
+#include "../incl/interface.h"
 #include "../incl/hostip.h"
 #include "../incl/manager.h"
 #include "../incl/wireguard.h"

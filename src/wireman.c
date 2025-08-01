@@ -2,7 +2,7 @@
 #include <string.h>
 
 #include "../incl/root.h"
-#include "../incl/server.h"
+#include "../incl/interface.h"
 #include "../incl/util.h"
 
 int main(int argc, char *argv[]) 
@@ -35,6 +35,6 @@ int main(int argc, char *argv[])
             add_peer(argv[2], argv[4]);
         }
     }
-    
+
     return 0;
 }

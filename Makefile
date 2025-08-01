@@ -2,18 +2,18 @@ CFLAGS = -Wall -Wextra -Wpedantic -g -fsanitize=address -lcurl
 SRC	= ./src
 INCL = ./incl
 
-wireman: wireman.o hostip.o root.o server.o manager.o wireguard.o util.o
-	gcc -o wireman ${SRC}/wireman.c ${SRC}/hostip.c ${SRC}/root.c ${SRC}/server.c \
+wireman: wireman.o hostip.o root.o interface.o manager.o wireguard.o util.o
+	gcc -o wireman ${SRC}/wireman.c ${SRC}/hostip.c ${SRC}/root.c ${SRC}/interface.c \
 		${SRC}/manager.c ${SRC}/wireguard.c ${SRC}/util.c ${CFLAGS}
 
-wireman.o: ${SRC}/wireman.c ${INCL}/root.h ${INCL}/server.h ${INCL}/util.h
+wireman.o: ${SRC}/wireman.c ${INCL}/root.h ${INCL}/interface.h ${INCL}/util.h
 	gcc -c ${SRC}/wireman.c
 
 root.o: ${SRC}/root.c ${INCL}/root.h
 	gcc -c ${SRC}/root.c
 
-server.o: ${SRC}/server.c ${INCL}/hostip.h ${INCL}/server.h ${INCL}/manager.h ${INCL}/wireguard.h
-	gcc -c ${SRC}/server.c
+interface.o: ${SRC}/interface.c ${INCL}/hostip.h ${INCL}/interface.h ${INCL}/manager.h ${INCL}/wireguard.h
+	gcc -c ${SRC}/interface.c
 
 hostip.o: ${SRC}/hostip.c ${INCL}/hostip.h
 	gcc -c ${SRC}/hostip.c
