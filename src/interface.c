@@ -62,7 +62,7 @@ int add_host(char *host)
 int add_peer(char *host, char *peer) 
 {
     Config conf = new_config();
-    char c, *endpoint, *address, allow[MAX_BUFFER] = "0.0.0.0/0, ::/0";   // TODO: read host <interface>.conf for number of peers and set accordingly.
+    char c, *endpoint, allow[MAX_BUFFER] = "0.0.0.0/0, ::/0";   // TODO: read host <interface>.conf for number of peers and set accordingly.
     int i, res;
 
     // generate and store keys
@@ -85,7 +85,6 @@ int add_peer(char *host, char *peer)
         return res;
     }
     free(endpoint);
-    // collect and add data to conf
 
     // set allowedIPs for peer.
     printf("Input allowed IPs for peer (default: 0.0.0.0/0, ::/0): ");
@@ -146,7 +145,7 @@ int keygen(Config conf, char *interface)
     store_key(interface, "pub", pub_base64);
     store_key(interface, "psk", psk_base64);
 
-    printf("\nkey: %s\npub: %s\n\n", key_base64, pub_base64);         // delete this line.
+    printf("\nkey: %s\npub: %s\npsk: %s\n\n", key_base64, pub_base64, psk_base64);         // delete this line.
 
     return res;
 }
@@ -156,7 +155,7 @@ int tunnel_address(Config conf)
     int i, res;
     char c, ip[IP_LEN + 1];     // TODO: find defaults.
 
-    printf("Input host address (default 10.0.0.X/24): ");
+    printf("Input tunnel address (default 10.0.0.X/24): ");
     for (i = 0; (c = getchar()) != '\n'; i++) {
         ip[i] = c;
     }
