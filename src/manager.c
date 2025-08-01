@@ -84,6 +84,7 @@ int write_config(Config conf, Client client, char *host, char *peer)
 {
     FILE *f;
     Path *p, *temp;
+    char *str, *key;
 
     switch (client) {
 
@@ -133,23 +134,33 @@ int write_config(Config conf, Client client, char *host, char *peer)
             fprintf(f, "PrivateKey = %s\n", conf->key);
             fprintf(f, "Address = %s\n", conf->address);
             fprintf(f, "\n[Peer]\n");
-            //PublicKey from host
+            
+            // retrieve host public key.
+            key = read_key(host, BASE64PUB);
+            fprintf(f, "PublicKey = %s\n", key);
+            free(key);
+
             fprintf(f, "PresharedKey = %s\n", conf->psk);
             fprintf(f, "Endpoint = %s\n", conf->endpoint);
             fprintf(f, "AllowedIPs = %s\n", conf->allow);
             fclose(f);
 
-            // edit host config
+            // modify /etc/wireguard/<interface>.conf.
             euid_helper(GAIN);
             f = file_copy(host);
-            if (!f) {
-                printf("error: file_copy returned garbage.\n");
-                return 1;
-            }
+        
             fprintf(f, "\n[Peer]\n");
             fprintf(f, "PublicKey = %s\n", conf->pub);
             fprintf(f, "PresharedKey = %s\n", conf->psk);
-            //fprintf(f, "AllowedIPs = %s\n", conf->allow); (/32)
+            
+            str = conf->address;
+            // change subnet on AllowedIP in host
+            while (*str++ != '/');
+            *str++ = '3';
+            *str++ = '2';
+            *str = '\0';     // make sure.
+            fprintf(f, "AllowedIPs = %s\n", conf->address);
+
             fclose(f);
             euid_helper(DROP);
             break;
