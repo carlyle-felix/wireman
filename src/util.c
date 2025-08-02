@@ -85,9 +85,8 @@ int recursive_remove(Path *dir)
 {
     DIR *d;
     struct dirent *p;
-	struct stat buffer;
     char path[MAX_BUFFER];
-    int len;
+    int len, res;
 
     d = opendir(dir);
     if (!d) {
@@ -100,12 +99,13 @@ int recursive_remove(Path *dir)
         }
     }
     
-    while (!(p = readdir(d))) {
+    while ((p = readdir(d))) {
         if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, "..")) {
             continue;
         }
 
-        sprintf(path, "%s%s", path, p->d_name);
+        sprintf(path, "%s/%s", dir, p->d_name);
+        printf("\n");
         if (is_dir(path)) {
             recursive_remove(path);
         } else {
@@ -113,8 +113,14 @@ int recursive_remove(Path *dir)
         }
     }
     closedir(d);
+    
+    res = rmdir(dir);
+    if (res) {
+        printf("error: failed to remove dir %s in recursive_remove().\n", dir);
+        return 1;
+    }
 
-    return rmdir(path);
+    return 0;
 }
 
 /*
