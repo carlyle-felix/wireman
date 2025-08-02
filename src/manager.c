@@ -470,26 +470,26 @@ containing only key.
 */
 int store_key(char *key_name, char *key_type, char *key)
 {
-    Path *p;
+    Path *p, *dir;
     FILE *f;
-    char *filename;
 
     // check for ~/.config/wireman/<key_name>, create if doesn't exist.
-    p = config_path(key_name);
-    if (!p) {
+    dir = config_path(key_name);
+    if (!dir) {
         return 1;
-    } else if (!is_dir(p)) {
-        mkdir(p, 0777);
+    } else if (!is_dir(dir)) {
+        mkdir(dir, 0777);
     }
-    free(p);
 
     // get absolute file path
-    p = malloc(strlen(wireman) + (strlen(key_name) * 2) + 2 + strlen(key_type) + 1);
+    p = malloc(strlen(dir) + strlen(key_name) + strlen(key_type) + 3);
     if (!p) {
         printf("error: failed to allocate memory for %s.%s\n", key_name, key_type);
+        free(dir);
         return 1;
     }
-    sprintf(p, "%s%s/%s.%s", wireman, key_name, key_name, key_type);
+    sprintf(p, "%s/%s.%s", dir, key_name, key_type);
+    free(dir);
 
     // write base64
     f = fopen(p, "w");
