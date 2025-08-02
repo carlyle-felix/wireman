@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
 
 
@@ -118,12 +117,12 @@ int write_config(Config conf, Client client, char *host, char *peer)
             fprintf(f, "Address = %s\n", conf->address);
             fprintf(f, "ListenPort = %s\n", conf->port);
             fclose(f);
+            
             break;
         
         case PEER:
             Path *temp = config_path(peer);
             if (!temp) {
-                printf("%s in write_host\n", peer);
                 return 1;
             }
 
@@ -173,6 +172,7 @@ int write_config(Config conf, Client client, char *host, char *peer)
 
             fclose(f);
             euid_helper(DROP);
+            
             break;
             
         default:
@@ -255,6 +255,9 @@ char *read_key(char *interface, Key type)
     int i;
 
     temp = config_path(interface);
+    if (!temp) {
+        return NULL;
+    }
     p = malloc(strlen(temp) + strlen(interface) + 6);
     if (!p) {
         printf("error: failed to allocate memory for path in read_key().\n");
@@ -262,6 +265,7 @@ char *read_key(char *interface, Key type)
         return NULL;
     }
 
+    // initialize path pointer for key type
     switch (type) {
 
         case BASE64KEY:     sprintf(p, "%s/%s.key", temp, interface);
@@ -303,31 +307,141 @@ Make peer NULL if none.
 int delete_interface(Client client, char *host, char *peer)
 {
 
-    Path *p;
-    /*
-    HOST:   -remove /etc/wireguard/<host>.conf.
+    Path *p, *wg;
+    int res;
 
-    PEER:   -retrieve pubkey from ~/.config/wireman/<peer>.<peer>.pub.
-            -recursively remove ~/.config/wireman/<peer>.
-            -locate pubkey in /etc/wireguard/<host>.conf and delete [Peer] entry.
-    */
+    wg = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(host) + 1);
+    if (!wg)  {
+        printf("error: failed to allocate memory for %s in delete_interface().\n", host);
+        return 1;
+    }
+    sprintf(wg, ETC_WIREGUARD_CONF, host);
 
     switch (client) {
 
-        case HOST:
-            p = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(host) + 1);
-            if (!p)  {
-                printf("error: failed to allocate memory for %s.\n", host);
-                return 1;
-            }
+        case HOST: 
+            remove(wg);
+            free(wg);
 
-            sprintf(p, ETC_WIREGUARD_CONF, host);
             break;
         
         case PEER:
-            //Path *temp = 
+            FILE *f;
+            char *pub, *buffer, *temp_buffer, *entry;
+            char *key = "[Peer]";
+            register int i;
+            int buffer_len, pub_len, key_len, start, del;
+
+            pub = read_key(peer, BASE64PUB);
+            if (!pub) {
+                return 1;
+            }
+
+            // recursively remove ~/.config/wireman/<interface> directory.
+            p = config_path(peer);
+            if (!p) {
+                return 1;
+            }
+            res = recursive_remove(p);
+            free(p);
+            if (res) {
+                printf("error: failed to remove %s directory in delete_interface.\n", peer);
+                free(pub);
+                return 1;
+            }
+
+            buffer = get_buffer(wg);
+            if (!buffer) {
+                free(pub);
+                free(wg);
+                return 1;
+            }
+
+            // delete peer entry in /etc/wireguard/<host>.conf.
+            buffer_len = strlen(buffer);
+            key_len = strlen(key);
+            pub_len = strlen(pub);
+            temp_buffer = buffer;
+            while (*buffer) {
+
+                // locate "[Peer]".
+                for (i = 0; *buffer == key[i]; i++) {
+                    buffer++;
+                }
+
+                if (i == key_len) {
+                    while (*buffer != pub[0]) {
+                        buffer--;
+                    }
+                    entry = buffer++;         // start of a peer entry.
+                } else {
+                    while (i-- > 0) {
+                        buffer--;
+                    }
+                }
+
+                // locate public key.
+                for (i = 0; *buffer == pub[i]; i++) {
+                    buffer++;
+                }
+
+                if (i == pub_len) {
+                    for (i = 0; *buffer++ != key[0] || *buffer != EOF; i++) {
+                        buffer++;
+                    }
+
+                    if (i == key_len) {
+                        while (i >= 0) {
+                            buffer--;
+                        }
+                        break;
+                    } else {
+                        while (i-- > 0) {
+                            buffer--;
+                        }
+                }
+                } else {
+                    while (i-- > 0) {
+                        buffer--;
+                    }
+                }
+
+                buffer++;
+            }
+            free(pub);
+
+            if (*buffer == EOF) {
+                printf("info: no peer entry found in %s.conf", host);
+                free(temp_buffer);
+                return 0;
+            }
+
+            // move left
+            start = (int) (entry - temp_buffer);
+            del = (int) (buffer - entry);       // number of characters to be deleted.
+            for (i = start; i < buffer_len - del; i++) {
+                temp_buffer[i] = temp_buffer[i + del];
+            }
+            temp_buffer[buffer_len - del] = '\0';
+
+            euid_helper(GAIN);
+            f = fopen(wg, "w");
+            free(wg);
+            if (!f) {
+                printf("error: failed to open %s.conf in delete_interface().\n", host);
+                return 1;
+            }
+            fwrite(temp_buffer, sizeof(char), strlen(temp_buffer) + 1, f);
+            free(temp_buffer);
+            fclose(f);
+            euid_helper(DROP);
+
+            break;
+
+        default:
+            break;
+
     }
-    free(p);
    
     return 0;
 }
@@ -345,7 +459,6 @@ int store_key(char *key_name, char *key_type, char *key)
     // check for ~/.config/wireman/<key_name>, create if doesn't exist.
     p = config_path(key_name);
     if (!p) {
-        printf("%s.\n", key_name);
         return 1;
     } else if (!is_dir(p)) {
         mkdir(p, 0777);

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "../incl/util.h"
 #include "../incl/manager.h"
@@ -41,7 +42,7 @@ char *config_path(char *dir)
 
     p = malloc(strlen(wireman) + strlen(dir) + 1);
     if (!p) {
-        printf("error: failed to allocate memory for ");
+        printf("error: failed to allocate memory for %s in config_path().\n", dir);
         return NULL;
     }
     sprintf(p, "%s%s", wireman, dir);
@@ -55,7 +56,6 @@ int is_dir(char *dir)
     
     p = config_path(dir);
     if (!p) {
-        printf("%s in is_dir().\n", dir);
         return 1;
     }
 
@@ -67,4 +67,97 @@ int is_dir(char *dir)
     }
 
     return 1;
+}
+
+int file_exists(char *file) 
+{
+    FILE *f;
+
+    f = fopen(file, "r");
+    if (!f) {
+        return 0;
+    } 
+    
+    return 1;
+}
+
+int recursive_remove(Path *dir)
+{
+    DIR *d;
+    struct dirent *p;
+	struct stat buffer;
+    char path[MAX_BUFFER];
+    int len;
+
+    d = opendir(dir);
+    if (!d) {
+        if (file_exists(dir)) {
+            remove(dir);
+            return 0;
+        } else {
+            printf("error: failed to open directory %s in recursive_remove().\n", dir);
+            return 1;
+        }
+    }
+    
+    while (!(p = readdir(d))) {
+        if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, "..")) {
+            continue;
+        }
+
+        sprintf(path, "%s%s", path, p->d_name);
+        if (is_dir(path)) {
+            recursive_remove(path);
+        } else {
+            remove(path);
+        }
+    }
+    closedir(d);
+
+    return rmdir(path);
+}
+
+/*
+NOTE: caller must free returned buffer.
+*/
+char *get_buffer(Path *p) 
+{
+
+    FILE *f;
+    char *buffer;
+    int read, max = MAX_BUFFER;
+
+    buffer = malloc(MAX_BUFFER);
+    for (;;) {
+
+        buffer = realloc(buffer, max);
+        if (!buffer) {
+            printf("error: failed to realloc buffer.\n");
+            return NULL;
+        }
+
+        f = fopen(p, "r");
+        if (!f) {
+            printf("error: failed to pipe %s.\n", p);
+            free(buffer);
+            return NULL;
+        }
+
+        read = fread(buffer, sizeof(char), max, f);
+        if (read == max) {
+            max *= 2;
+        } else {
+            fclose(f);
+            break;
+        }
+    }
+    
+    buffer[read] = '\0';
+    if (!buffer[0]) {
+        printf("error: NULL buffer in get_buffer().\n");
+        free(buffer);
+        return NULL;
+    }
+
+    return buffer;
 }

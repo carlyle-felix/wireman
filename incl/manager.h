@@ -27,5 +27,6 @@ int store_key(char *key_name, char *key_type, char *key);
 FILE *file_copy(char *interface);
 char *read_key(char *interface, Key type);
 int keygen(Config conf, char *interface);
+int delete_interface(Client client, char *host, char *peer);
 
 #endif
