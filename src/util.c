@@ -16,11 +16,7 @@ int config_home(void)
 
     home = getenv("HOME");      // initialize global home path.
     
-    p = malloc(strlen(home) + 18);
-    if (!p) {
-        printf("error: malloc failed in config_home().");
-        return 1;
-    }
+    p = mem_alloc(strlen(home) + 18);
     strcpy(p, home);
     wireman = strcat(p, CONFIG_WIREMAN);       // initialize global wireman path.
 
@@ -40,11 +36,7 @@ char *config_path(char *dir)
 {
     Path *p;
 
-    p = malloc(strlen(wireman) + strlen(dir) + 1);
-    if (!p) {
-        printf("error: failed to allocate memory for %s in config_path().\n", dir);
-        return NULL;
-    }
+    p = mem_alloc(strlen(wireman) + strlen(dir) + 1);
     sprintf(p, "%s%s", wireman, dir);
 
     return p;
@@ -132,7 +124,7 @@ char *get_buffer(Path *p)
     char *buffer;
     int read, max = MAX_BUFFER;
 
-    buffer = malloc(MAX_BUFFER);
+    buffer = mem_alloc(MAX_BUFFER);
     for (;;) {
 
         buffer = realloc(buffer, max);
@@ -165,4 +157,15 @@ char *get_buffer(Path *p)
     }
 
     return buffer;
+}
+
+void *mem_alloc(int bytes)
+{
+    void *temp = malloc(bytes);
+    if (!temp) {
+        printf("error: unable to allocate memory in mem_alloc()\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return temp;
 }

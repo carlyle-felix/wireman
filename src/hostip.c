@@ -4,6 +4,7 @@
 #include <curl/curl.h>
 
 #include "../incl/hostip.h"
+#include "../incl/util.h"
 
 #define CURL_IP "https://api.ipify.org/"
 
@@ -20,26 +21,12 @@ char *host_ip(void)
     Memory *buffer;
     char *ip = NULL;
 
-    buffer = malloc(sizeof(Memory));
-    if (!buffer) {
-        printf("error: failed to allocate memory for public ip buffer.\n");
-        return NULL;
-    }
-    
-    buffer->response = malloc(sizeof(char));
-    if (!buffer->response) {
-        printf("error: failed to allocate memory for response buffer.\n");
-        return NULL;
-    }
-    buffer->size = 0;
-    
+    buffer = mem_alloc(sizeof(Memory)); 
+    buffer->response = mem_alloc(sizeof(char));
+    buffer->size = 0; 
     curl(buffer);
     
-    ip = malloc(strlen(buffer->response) + 1);
-    if (!ip) {
-        printf("error: failed to allocate memory for public IP return variable.\n");
-        return NULL;
-    }
+    ip = mem_alloc(strlen(buffer->response) + 1);
     strcpy(ip, buffer->response);
 
     free(buffer->response);

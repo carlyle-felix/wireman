@@ -8,9 +8,6 @@
 #include "../incl/root.h"
 #include "../incl/util.h"
 
-#define ETC_WIREGUARD "/etc/wireguard/"
-#define ETC_WIREGUARD_CONF "/etc/wireguard/%s.conf"
-
 extern Path *wireman;
 
 struct config {
@@ -54,11 +51,7 @@ void clear_config(Config p)
 
 int add_key(Config conf, Field key, char *s)
 {
-    char *p = malloc(strlen(s) + 1);
-    if (!p) {
-        printf("error: failed to allocate memory in config for %s\n", s);
-        return 1;
-    }
+    char *p = mem_alloc(strlen(s) + 1);
     strcpy(p, s);
 
     switch (key) {
@@ -91,18 +84,14 @@ int write_config(Config conf, Client client, char *host, char *peer)
 {
     FILE *f;
     Path *p, *temp;
-    char *str, *key;
+    char *ip, *key;
 
     switch (client) {
 
         case HOST: 
-            p = malloc(strlen(host) + 21);        // additional chars in path = 20
-            if (!p) {
-                printf("error: failed to allocate memory for path\n");
-                return 1;
-            }
-
+            p = mem_alloc(strlen(host) + 21);        // additional chars in path = 20
             sprintf(p, ETC_WIREGUARD_CONF, host);
+            
             euid_helper(GAIN);      // gain root
             f = fopen(p, "w");
             euid_helper(DROP);      // drop root
@@ -110,8 +99,10 @@ int write_config(Config conf, Client client, char *host, char *peer)
                 printf("error: failed to open %s\n", p);
                 return 1;
             }
+            
             fprintf(f, "[Interface]\n");
             fprintf(f, "PrivateKey = %s\n", conf->key);
+            fprintf(f, "PublicKey = %s\n", conf->pub);
             fprintf(f, "Address = %s\n", conf->address);
             fprintf(f, "ListenPort = %s\n", conf->port);
             fclose(f);
@@ -124,11 +115,7 @@ int write_config(Config conf, Client client, char *host, char *peer)
                 return 1;
             }
 
-            p = malloc(strlen(temp) + strlen(peer) + 7);
-            if (!p) {
-                printf("error: failed to allocate memory for path.\n");
-                return 1;
-            }
+            p = mem_alloc(strlen(temp) + strlen(peer) + 7);
             sprintf(p, "%s/%s.conf", temp, peer);
             free(temp);
 
@@ -139,11 +126,15 @@ int write_config(Config conf, Client client, char *host, char *peer)
             }
             fprintf(f, "[Interface]\n");
             fprintf(f, "PrivateKey = %s\n", conf->key);
+            fprintf(f, "PublicKey = %s\n", conf->pub);
             fprintf(f, "Address = %s\n", conf->address);
             fprintf(f, "\n[Peer]\n");
             
             // retrieve host public key.
-            key = read_key(host, BASE64PUB);
+            key = read_key(host, HOST, PUB);
+            if (!key) {
+                printf("warning: host PublicKey not found.\n");
+            }
             fprintf(f, "PublicKey = %s\n", key);
             free(key);
 
@@ -152,6 +143,17 @@ int write_config(Config conf, Client client, char *host, char *peer)
             fprintf(f, "AllowedIPs = %s\n", conf->allow);
             fclose(f);
 
+            ip = conf->address;
+            // change subnet on AllowedIP in host
+            while (*ip && *ip++ != '/');
+            if (!*ip) {
+                printf("error: incorrect address format.\n");
+                return 1;
+            }
+            *ip++ = '3';
+            *ip++ = '2';
+            *ip = '\0';     // make sure.
+
             // modify /etc/wireguard/<interface>.conf.
             euid_helper(GAIN);
             f = file_copy(host);
@@ -159,13 +161,6 @@ int write_config(Config conf, Client client, char *host, char *peer)
             fprintf(f, "\n[Peer]\n");
             fprintf(f, "PublicKey = %s\n", conf->pub);
             fprintf(f, "PresharedKey = %s\n", conf->psk);
-            
-            str = conf->address;
-            // change subnet on AllowedIP in host
-            while (*str++ != '/');
-            *str++ = '3';
-            *str++ = '2';
-            *str = '\0';     // make sure.
             fprintf(f, "AllowedIPs = %s\n", conf->address);
 
             fclose(f);
@@ -192,18 +187,10 @@ FILE *file_copy(char *interface)
     Path *old_conf, *new_conf, *temp_conf;
     char buffer[MAX_BUFFER];
 
-    old_conf = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
-    if (!old_conf) {
-        printf("error: failed to allocate memory for old file pointer\n");
-        return NULL;
-    }
+    old_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
     sprintf(old_conf, ETC_WIREGUARD_CONF, interface);
 
-    temp_conf = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 4);
-    if (!temp_conf) {
-        printf("error: failed to allocate memory for temp file pointer\n");
-        return NULL;
-    }
+    temp_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 4);
     sprintf(temp_conf, ETC_WIREGUARD_CONF".old", interface);
 
     rename(old_conf, temp_conf);
@@ -216,11 +203,7 @@ FILE *file_copy(char *interface)
         return NULL;
     }
 
-    new_conf = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
-    if (!new_conf) {
-        printf("error: failed to allocate memory for new file pointer\n");
-        return NULL;
-    }
+    new_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
     sprintf(new_conf, ETC_WIREGUARD_CONF, interface);
 
     new_file = fopen(new_conf, "w");
@@ -355,11 +338,7 @@ int delete_interface(Client client, char *host, char *peer)
     char *pub, *buffer, *temp_buffer, *entry, *key = "[Peer]";;
     register int i;
 
-    wg = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(host) + 1);
-    if (!wg)  {
-        printf("error: failed to allocate memory for %s in delete_interface().\n", host);
-        return 1;
-    }
+    wg = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(host) + 1);
     sprintf(wg, ETC_WIREGUARD_CONF, host);
 
     switch (client) {
@@ -388,7 +367,7 @@ int delete_interface(Client client, char *host, char *peer)
             break;
         
         case PEER:
-            pub = read_key(peer, BASE64PUB);
+            pub = read_key(peer, PEER, PUB);
             if (!pub) {
                 return 1;
             }
@@ -402,6 +381,7 @@ int delete_interface(Client client, char *host, char *peer)
                     return 1;
                 }
 
+                buffer_len = strlen(buffer);
                 key_len = strlen(key);
                 pub_len = strlen(pub);
                 temp_buffer = buffer;
@@ -461,10 +441,8 @@ int delete_interface(Client client, char *host, char *peer)
                 free(pub);
 
                 // update counts
-                buffer_len = strlen(temp_buffer);
                 start = (int) (entry - temp_buffer);    // start of entry to be deleted.
                 del = (int) (buffer - entry);       // number of characters to be deleted.
-
                 // move left
                 for (i = start; i < buffer_len - del; i++) {
                     temp_buffer[i] = temp_buffer[i + del];
@@ -525,12 +503,7 @@ int store_key(char *key_name, char *key_type, char *key)
     }
 
     // get absolute file path
-    p = malloc(strlen(dir) + strlen(key_name) + strlen(key_type) + 3);
-    if (!p) {
-        printf("error: failed to allocate memory for %s.%s\n", key_name, key_type);
-        free(dir);
-        return 1;
-    }
+    p = mem_alloc(strlen(dir) + strlen(key_name) + strlen(key_type) + 3);
     sprintf(p, "%s/%s.%s", dir, key_name, key_type);
     free(dir);
 
