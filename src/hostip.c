@@ -5,7 +5,6 @@
 
 #include "../incl/hostip.h"
 
-#define IP_LEN 15
 #define CURL_IP "https://api.ipify.org/"
 
 typedef struct {

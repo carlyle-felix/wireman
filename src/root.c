@@ -19,24 +19,22 @@ int euid_helper(Euid_ops option)
 
         case GAIN:
             res = seteuid(0);
-    	if (res != 0) {
+    	if (res) {
 		        printf("error: gain_root() failed\n");
                 break;
             }
-	        printf("gained root, euid: %d\n", geteuid());
             break;
 
         case DROP:
             pw = getpwnam(getlogin());
 	        uid = pw->pw_uid;
 	        res = seteuid(uid);
-            if (res != 0) {
+            if (res) {
 		        printf("error: drop_root() failed\n");
                 break;
 	        }
             pw = getpwuid(uid);
 	        setenv("HOME", pw->pw_dir, 1);
-	        printf("root dropped, euid: %d\n", geteuid());
             break;
 
         default:

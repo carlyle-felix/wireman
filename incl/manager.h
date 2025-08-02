@@ -22,11 +22,9 @@ Config new_config(void);
 void clear_config(Config p);
 int write_config(Config conf, Client client, char *host, char *peer);
 int add_key(Config conf, Field key, char *s);
-int tunnel_address(Config conf);
 int store_key(char *key_name, char *key_type, char *key);
 FILE *file_copy(char *interface);
 char *read_key(char *interface, Key type);
-int keygen(Config conf, char *interface);
 int delete_interface(Client client, char *host, char *peer);
 
 #endif
