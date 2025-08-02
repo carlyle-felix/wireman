@@ -337,19 +337,6 @@ int delete_interface(Client client, char *host, char *peer)
                 return 1;
             }
 
-            // recursively remove ~/.config/wireman/<interface> directory.
-            p = config_path(peer);
-            if (!p) {
-                return 1;
-            }
-            res = recursive_remove(p);
-            free(p);
-            if (res) {
-                printf("error: failed to remove %s directory in delete_interface.\n", peer);
-                free(pub);
-                return 1;
-            }
-
             buffer = get_buffer(wg);
             if (!buffer) {
                 free(pub);
@@ -435,6 +422,18 @@ int delete_interface(Client client, char *host, char *peer)
             free(temp_buffer);
             fclose(f);
             euid_helper(DROP);
+
+            // recursively remove ~/.config/wireman/<interface> directory.
+            p = config_path(peer);
+            if (!p) {
+                return 1;
+            }
+            res = recursive_remove(p);
+            free(p);
+            if (res) {
+                free(pub);
+                return 1;
+            }
 
             break;
 
