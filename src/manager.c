@@ -320,8 +320,22 @@ int delete_interface(Client client, char *host, char *peer)
     switch (client) {
 
         case HOST: 
+            euid_helper(GAIN);
             remove(wg);
+            euid_helper(DROP);
             free(wg);
+
+            // recursively remove ~/.config/wireman/<interface> directory.
+            p = config_path(host);
+            if (!p) {
+                return 1;
+            }
+            
+            res = recursive_remove(p);
+            free(p);
+            if (res) {
+                return 1;
+            }
 
             break;
         
@@ -384,7 +398,7 @@ int delete_interface(Client client, char *host, char *peer)
                                 buffer--;
                             }
                             // buffer is now at the beginning of next entry.
-                            // check for eof
+                            
                             break;
                         } else {
                             while (i-- > 0) {
@@ -432,14 +446,14 @@ int delete_interface(Client client, char *host, char *peer)
             if (!p) {
                 return 1;
             }
-            /*
+            
             res = recursive_remove(p);
             free(p);
             if (res) {
                 free(pub);
                 return 1;
             }
-            */
+            
             break;
 
         default:
