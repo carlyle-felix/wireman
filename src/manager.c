@@ -239,69 +239,109 @@ FILE *file_copy(char *interface)
 }
 
 /*
-read keys from ~/.config/wireman/<interface>/<interface>.<type>
-Keys:   BASE64KEY
-        BASE64PUB
-        BASE64BASE
-NOTE: caller must free return value.
+Read any key in the Field enum as long as it's in the config file.
+Client is the target config.
+reads from: HOST: /etc/wireguard/<interface>.conf.
+            PEER: ~/.config/wireman/<interface>/<interface>.conf.
+NOTE: caller must free returned pointer.
 */
-char *read_key(char *interface, Key type)
+char *read_key(char *interface, Client client, Field type) 
 {
-    FILE *f;
-    Path *temp, *p;
-    char c, *value, buffer[MAX_BUFFER];
-    int i;
+    Path *p;
+    char *buffer, *temp, *key = NULL, value[MAX_BUFFER];
+    int len;
+    register int i;
 
-    temp = config_path(interface);
-    if (!temp) {
-        return NULL;
-    }
-    if (is_dir(temp)) {
-        printf("error: %s not found.\n", temp);
-        free(temp);
-        return NULL;
-    }
-    p = malloc(strlen(temp) + strlen(interface) + 6);
-    if (!p) {
-        printf("error: failed to allocate memory for path in read_key().\n");
-        free(temp);
-        return NULL;
+    // initialize path
+    switch (client) {
+
+        case HOST:
+            p = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
+            sprintf(p, ETC_WIREGUARD_CONF, interface);
+            
+            break;
+
+        case PEER:
+            temp = config_path(interface);
+            if (is_dir(temp)) {
+                printf("error: %s not found.\n", temp);
+                free(temp);
+                return NULL;
+            }
+
+            p = mem_alloc(strlen(temp) + strlen(interface) + 7);
+            sprintf(p, "%s/%s.conf", temp, interface);
+            free(temp);
+
+            break;
+
+        default:
+            break;
     }
 
-    // initialize path pointer for key type
+
     switch (type) {
 
-        case BASE64KEY:     sprintf(p, "%s/%s.key", temp, interface);
-                            break;
-        case BASE64PUB:     sprintf(p, "%s/%s.pub", temp, interface);
-                            break;
-        case BASE64PSK:     sprintf(p, "%s/%s.psk", temp, interface);
-                            break;
-        default:            break;
+        case ADDRESS:   key = mem_alloc(strlen("address") + 1);
+                        strcpy(key, "Address");
+                        break;
+        case KEY:       key = mem_alloc(strlen("privatekey") + 1);
+                        strcpy(key, "PrivateKey");
+                        break;
+        case PUB:       key = mem_alloc(strlen("publickey") + 1);
+                        strcpy(key, "PublicKey");
+                        break;
+        case PSK:       key = mem_alloc(strlen("presharedkey") + 1);
+                        strcpy(key, "PresharedKey");
+                        break;
+        case PORT:      key = mem_alloc(strlen("listeningport") + 1);
+                        strcpy(key, "ListeningPort");
+                        break;
+        case ALLOW:     key = mem_alloc(strlen("allowedips") + 1);
+                        strcpy(key, "AllowedIPs");
+                        break;
+        default:        printf("error: unkown key!\n");
+                        return NULL;
+    }
+
+    buffer = get_buffer(p);
+    free(p);
+    if (!buffer) {
+        return NULL;
+    }
+
+    temp = buffer;
+    len = strlen(key);
+    while (buffer++) {
+
+        for (i = 0; *buffer == key[i]; i++) {
+            if (*buffer != key[i]) {
+                break;
+            }
+            buffer++;
+        }
+
+        if (i == len) {
+            buffer += 3;        // increment " = ".
+
+            for (i = 0; *buffer != '\n'; i++) {
+            value[i] = *buffer++;
+            }
+            value[i] = '\0';
+
+            if (value) {
+                break;
+            } else {
+                buffer -= (len - 1);        // go back to char after intitial trigger.
+            }
+        }
     }
     free(temp);
 
-    f = fopen(p, "r");
-    if (!f) {
-        printf("error: failed to open %s", p);
-        free(p);
-        return NULL;
-    }
-    free(p);
+    temp = mem_alloc(strlen(value) + 1);
+    strcpy(temp, value);
 
-    for (i = 0; (c = fgetc(f)) != EOF; i++) {
-        buffer[i] = c;
-    }   
-    buffer[i] = '\0';
-
-    value = malloc(strlen(buffer) + 1);
-    if (!value) {
-        printf("error: unable to allocate memory for return value in read_key().\n");
-        return NULL;
-    }
-    strcpy(value, buffer);
-
-    return value;
+    return temp;
 }
 
 /*
