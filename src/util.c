@@ -86,7 +86,7 @@ int recursive_remove(Path *dir)
     DIR *d;
     struct dirent *p;
     char path[MAX_BUFFER];
-    int len, res;
+    int res;
 
     d = opendir(dir);
     if (!d) {

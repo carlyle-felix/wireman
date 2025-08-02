@@ -92,7 +92,7 @@ Field:  HOST
 int write_config(Config conf, Client client, char *host, char *peer)
 {
     FILE *f;
-    Path *p;
+    Path *p, *temp;
     char *str, *key;
 
     switch (client) {
@@ -121,7 +121,7 @@ int write_config(Config conf, Client client, char *host, char *peer)
             break;
         
         case PEER:
-            Path *temp = config_path(peer);
+            temp = config_path(peer);
             if (!temp) {
                 return 1;
             }
@@ -233,7 +233,7 @@ FILE *file_copy(char *interface)
     free(new_conf);
 
     while (fgets(buffer, MAX_BUFFER, old_file)) {
-        fprintf(new_file, buffer);
+        fprintf(new_file, "%s", buffer);
     }
     fclose(old_file);
 
@@ -311,9 +311,11 @@ Make peer NULL if none.
 */
 int delete_interface(Client client, char *host, char *peer)
 {
-
+    FILE *f;
     Path *p, *wg;
-    int res;
+    int buffer_len, pub_len, key_len, start, del, res;
+    char *pub, *buffer, *temp_buffer, *entry, *key = "[Peer]";;
+    register int i;
 
     wg = malloc(strlen(ETC_WIREGUARD_CONF) + strlen(host) + 1);
     if (!wg)  {
@@ -348,12 +350,6 @@ int delete_interface(Client client, char *host, char *peer)
             break;
         
         case PEER:
-            FILE *f;
-            char *pub, *buffer, *temp_buffer, *entry;
-            char *key = "[Peer]";
-            register int i;
-            int buffer_len, pub_len, key_len, start, del;
-
             pub = read_key(peer, BASE64PUB);
             if (!pub) {
                 return 1;
@@ -458,7 +454,6 @@ int delete_interface(Client client, char *host, char *peer)
             res = recursive_remove(p);
             free(p);
             if (res) {
-                free(pub);
                 return 1;
             }
             
@@ -506,7 +501,7 @@ int store_key(char *key_name, char *key_type, char *key)
         printf("error: failed to create %s.%s\n", key_name, key_type);
         return 1;
     }
-    fprintf(f, key);
+    fprintf(f, "%s", key);
     fclose(f);
 
     return 0;
