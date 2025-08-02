@@ -258,6 +258,11 @@ char *read_key(char *interface, Key type)
     if (!temp) {
         return NULL;
     }
+    if (!is_dir(temp)) {
+        printf("error: %s not found.\n", temp);
+        free(temp);
+        return NULL;
+    }
     p = malloc(strlen(temp) + strlen(interface) + 6);
     if (!p) {
         printf("error: failed to allocate memory for path in read_key().\n");
@@ -316,6 +321,12 @@ int delete_interface(Client client, char *host, char *peer)
         return 1;
     }
     sprintf(wg, ETC_WIREGUARD_CONF, host);
+    
+    if (!file_exists(wg)) {
+        printf("error: interface %s not found.\n", wg);
+        free(wg);
+        return 1;
+    }
 
     switch (client) {
 
@@ -333,9 +344,6 @@ int delete_interface(Client client, char *host, char *peer)
             
             res = recursive_remove(p);
             free(p);
-            if (res) {
-                return 1;
-            }
 
             break;
         

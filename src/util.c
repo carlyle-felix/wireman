@@ -94,7 +94,6 @@ int recursive_remove(Path *dir)
             remove(dir);
             return 0;
         } else {
-            printf("error: failed to open directory %s in recursive_remove().\n", dir);
             return 1;
         }
     }
