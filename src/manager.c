@@ -345,11 +345,10 @@ int delete_interface(Client client, char *host, char *peer)
             }
 
             // delete peer entry in /etc/wireguard/<host>.conf.
-            buffer_len = strlen(buffer);
             key_len = strlen(key);
             pub_len = strlen(pub);
             temp_buffer = buffer;
-            while (*buffer) {
+            while (*buffer++) {
 
                 // locate "[Peer]".
                 for (i = 0; *buffer == key[i]; i++) {
@@ -357,7 +356,7 @@ int delete_interface(Client client, char *host, char *peer)
                 }
 
                 if (i == key_len) {
-                    while (*buffer != pub[0]) {
+                    while (*buffer != key[0]) {
                         buffer--;
                     }
                     entry = buffer++;         // start of a peer entry.
@@ -373,44 +372,49 @@ int delete_interface(Client client, char *host, char *peer)
                 }
 
                 if (i == pub_len) {
-                    for (i = 0; *buffer++ != key[0] || *buffer != EOF; i++) {
-                        buffer++;
-                    }
 
-                    if (i == key_len) {
-                        while (i >= 0) {
-                            buffer--;
+                    while (*buffer++) {
+                        // locate next "[Peer]".
+                        for (i = 0; *buffer == key[i]; i++) {
+                            buffer++;
                         }
-                        break;
-                    } else {
-                        while (i-- > 0) {
-                            buffer--;
+
+                        if (i == key_len) {
+                            while (*buffer != key[0]) {
+                                buffer--;
+                            }
+                            // buffer is now at the beginning of next entry.
+                            // check for eof
+                            break;
+                        } else {
+                            while (i-- > 0) {
+                                buffer--;
+                            }
+                            continue;
                         }
-                }
+                    } 
+                    break;
+
                 } else {
                     while (i-- > 0) {
                         buffer--;
                     }
                 }
-
-                buffer++;
             }
             free(pub);
 
-            if (*buffer == EOF) {
-                printf("info: no peer entry found in %s.conf", host);
-                free(temp_buffer);
-                return 0;
-            }
+            // update counts
+            buffer_len = strlen(temp_buffer);
+            start = (int) (entry - temp_buffer);    // start of entry to be deleted.
+            del = (int) (buffer - entry);       // number of characters to be deleted.
 
             // move left
-            start = (int) (entry - temp_buffer);
-            del = (int) (buffer - entry);       // number of characters to be deleted.
             for (i = start; i < buffer_len - del; i++) {
                 temp_buffer[i] = temp_buffer[i + del];
             }
             temp_buffer[buffer_len - del] = '\0';
 
+            // write the modified buffer into config file
             euid_helper(GAIN);
             f = fopen(wg, "w");
             free(wg);
@@ -418,23 +422,24 @@ int delete_interface(Client client, char *host, char *peer)
                 printf("error: failed to open %s.conf in delete_interface().\n", host);
                 return 1;
             }
-            fwrite(temp_buffer, sizeof(char), strlen(temp_buffer) + 1, f);
+            fwrite(temp_buffer, sizeof(char), strlen(temp_buffer), f);
             free(temp_buffer);
             fclose(f);
             euid_helper(DROP);
-
+            
             // recursively remove ~/.config/wireman/<interface> directory.
             p = config_path(peer);
             if (!p) {
                 return 1;
             }
+            /*
             res = recursive_remove(p);
             free(p);
             if (res) {
                 free(pub);
                 return 1;
             }
-
+            */
             break;
 
         default:
