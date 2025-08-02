@@ -17,7 +17,7 @@ interface.o: ${SRC}/interface.c ${INCL}/hostip.h ${INCL}/interface.h ${INCL}/man
 		${INCL}/wireguard.h
 	gcc -c ${SRC}/interface.c
 
-hostip.o: ${SRC}/hostip.c ${INCL}/hostip.h
+hostip.o: ${SRC}/hostip.c ${INCL}/hostip.h ${INCL}/util.h
 	gcc -c ${SRC}/hostip.c
 
 manager.o: ${SRC}/manager.c ${INCL}/manager.h ${INCL}/root.h ${INCL}/util.h
