@@ -51,10 +51,16 @@ NOTE: free the pointer.
 */
 char *config_wireman(char *dir) 
 {
-    Path *p;
-
-    p = mem_alloc(strlen(wireman) + strlen(dir) + 1);
+    Path *p = mem_alloc(strlen(wireman) + strlen(dir) + 1);
     sprintf(p, "%s%s", wireman, dir);
+
+    return p;
+}
+
+char *config_wireguard(char *interface)
+{
+    Path *p = mem_alloc((strlen(ETC_WIREGUARD_CONF) -2) +  strlen(interface) + 1);      // -2 for format specifier
+    sprintf(p, ETC_WIREGUARD_CONF, interface);
 
     return p;
 }
@@ -172,9 +178,7 @@ int store_key(char *key_name, char *key_type, char *key)
 
     // check for ~/.config/wireman/<key_name>, create if doesn't exist.
     dir = config_wireman(key_name);
-    if (!dir) {
-        return 1;
-    } else if (!is_dir(dir)) {
+    if (!is_dir(dir)) {
         mkdir(dir, 0777);
     }
 
@@ -229,7 +233,7 @@ int tunnel_address(Config conf)
 
 /*
 copy contents of old <host_interface>.conf into new
-NOTE: caller must close returned file.
+NOTE: caller must close returned file and delete <interface>.conf.old.
 */
 FILE *file_copy(char *interface)
 {
@@ -237,15 +241,19 @@ FILE *file_copy(char *interface)
     Path *old_conf, *new_conf, *temp_conf;
     char buffer[MAX_BUFFER];
 
-    old_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
-    sprintf(old_conf, ETC_WIREGUARD_CONF, interface);
+    old_conf = config_wireguard(interface);
 
+    // rename to <interface>.conf.olf
     temp_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 4);
     sprintf(temp_conf, ETC_WIREGUARD_CONF".old", interface);
 
+    // remove <interface>.conf
     rename(old_conf, temp_conf);
     remove(old_conf); 
     free(old_conf);
+
+    // new, empty <interface>.conf
+    new_conf = config_wireguard(interface);
 
     old_file = fopen(temp_conf, "r");
     if (!old_file) {
@@ -253,19 +261,17 @@ FILE *file_copy(char *interface)
         return NULL;
     }
 
-    new_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
-    sprintf(new_conf, ETC_WIREGUARD_CONF, interface);
-
     new_file = fopen(new_conf, "w");
+    free(new_conf);
     if (!new_file) {
         printf("error: unable to open old %s.conf", interface);
         return NULL;
     }
-    free(new_conf);
 
     while (fgets(buffer, MAX_BUFFER, old_file)) {
         fprintf(new_file, "%s", buffer);
     }
+
     fclose(old_file);
 
     return new_file;
@@ -275,6 +281,7 @@ FILE *file_copy(char *interface)
 write data to configs for specified interface
 Field:  HOST
         SERVER
+TODO: delete /etc/wireguard/<interface>.conf.old created by file_copy().
 */
 int write_config(Config conf, Client client, char *host, char *peer)
 {
@@ -285,8 +292,7 @@ int write_config(Config conf, Client client, char *host, char *peer)
     switch (client) {
 
         case HOST: 
-            p = mem_alloc(strlen(host) + 21);        // additional chars in path = 20
-            sprintf(p, ETC_WIREGUARD_CONF, host);
+            p = config_wireguard(host);
             
             euid_helper(GAIN);      // gain root
             f = fopen(p, "w");
@@ -307,9 +313,6 @@ int write_config(Config conf, Client client, char *host, char *peer)
         
         case PEER:
             temp = config_wireman(peer);
-            if (!temp) {
-                return 1;
-            }
 
             p = mem_alloc(strlen(temp) + strlen(peer) + 7);
             sprintf(p, "%s/%s.conf", temp, peer);
@@ -383,8 +386,7 @@ int delete_interface(Client client, char *host, char *peer)
     char *pub, *buffer, *temp_buffer, *entry, *key = "[Peer]";;
     register int i;
 
-    wg = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(host) + 1);
-    sprintf(wg, ETC_WIREGUARD_CONF, host);
+    wg = config_wireguard(host);
 
     switch (client) {
 
@@ -549,9 +551,7 @@ char *read_key(char *interface, Client client, Field type)
     switch (client) {
 
         case HOST:
-            p = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
-            sprintf(p, ETC_WIREGUARD_CONF, interface);
-            
+            p = config_wireguard(interface);
             break;
 
         case PEER:
