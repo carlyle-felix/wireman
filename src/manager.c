@@ -3,12 +3,18 @@
 #include <string.h>
 #include <sys/stat.h>
 
-
 #include "../incl/manager.h"
 #include "../incl/root.h"
 #include "../incl/util.h"
+#include "../incl/wireguard.h"
 
-extern Path *wireman;
+#define CONFIG_WIREMAN "/.config/wireman/"
+#define ETC_WIREGUARD "/etc/wireguard/"
+#define ETC_WIREGUARD_CONF "/etc/wireguard/%s.conf"
+#define IP_LEN 15
+
+FILE *file_copy(char *interface);
+int store_key(char *key_name, char *key_type, char *key);
 
 struct config {
     char *address;
@@ -19,6 +25,40 @@ struct config {
     char *endpoint;
     char *allow;
 };
+
+Path *wireman;
+
+int config_home(void)
+{
+    Path *home, *p;
+
+    home = getenv("HOME");      // initialize global home path.
+    
+    p = mem_alloc(strlen(home) + 18);
+    strcpy(p, home);
+    wireman = strcat(p, CONFIG_WIREMAN);       // initialize global wireman path.
+
+    // create ~/.config/wireman if it doesn't exist.
+    if (!is_dir(wireman)) {
+        mkdir(wireman, 0777);
+    } 
+
+    return 0;
+}
+
+/*
+return the absolute path of the ~/.config/wireman/<dir> directory
+NOTE: free the pointer.
+*/
+char *config_path(char *dir) 
+{
+    Path *p;
+
+    p = mem_alloc(strlen(wireman) + strlen(dir) + 1);
+    sprintf(p, "%s%s", wireman, dir);
+
+    return p;
+}
 
 Config new_config(void) 
 {
@@ -73,6 +113,162 @@ int add_key(Config conf, Field key, char *s)
     }
 
     return 0;
+}
+
+int keygen(Config conf, char *interface)
+{
+    wg_key key, pub, psk;
+    wg_key_b64_string key_base64, pub_base64, psk_base64;
+    int res;
+
+    // generate keys
+    wg_generate_private_key(key);
+    wg_generate_public_key(pub, key);
+    wg_generate_preshared_key(psk);
+    
+    // private key
+    wg_key_to_base64(key_base64, key);
+    res = add_key(conf, KEY, key_base64);
+    if (res) {
+        printf("error: failed to add key.\n");
+        clear_config(conf);
+        return res;
+    }
+
+    // public key
+    wg_key_to_base64(pub_base64, pub);
+    res = add_key(conf, PUB, pub_base64);
+    if (res) {
+        printf("error: failed to add pub.\n");
+        clear_config(conf);
+        return res;
+    }
+
+    // preshared key
+    wg_key_to_base64(psk_base64, psk);
+    res = add_key(conf, PSK, psk_base64);
+    if (res) {
+        printf("error: failed to add psk.\n");
+        clear_config(conf);
+        return res;
+    }
+
+    store_key(interface, "key", key_base64);        // TODO: only store this on demand.
+    store_key(interface, "pub", pub_base64);
+    store_key(interface, "psk", psk_base64);
+
+    printf("\nkey: %s\npub: %s\npsk: %s\n\n", key_base64, pub_base64, psk_base64);         // delete this line.
+
+    return res;
+}
+
+/*
+create a file ~/.conf/wireman/<key_name>.<key_type> 
+containing only key.
+*/
+int store_key(char *key_name, char *key_type, char *key)
+{
+    Path *p, *dir;
+    FILE *f;
+
+    // check for ~/.config/wireman/<key_name>, create if doesn't exist.
+    dir = config_path(key_name);
+    if (!dir) {
+        return 1;
+    } else if (!is_dir(dir)) {
+        mkdir(dir, 0777);
+    }
+
+    // get absolute file path
+    p = mem_alloc(strlen(dir) + strlen(key_name) + strlen(key_type) + 3);
+    sprintf(p, "%s/%s.%s", dir, key_name, key_type);
+    free(dir);
+
+    // write base64
+    f = fopen(p, "w");
+    free(p);
+    if (!f) {
+        printf("error: failed to create %s.%s\n", key_name, key_type);
+        return 1;
+    }
+    fprintf(f, "%s", key);
+    fclose(f);
+
+    return 0;
+}
+
+int tunnel_address(Config conf)
+{
+    int i, res;
+    char c, ip[IP_LEN + 1];     // TODO: find defaults.
+
+    /*
+        if host interface doesn't exisit in /etc/wireguard/<interface>.conf, make default IP 10.0.0.1/24
+
+        else,
+
+        copy the host Address into a temp variable and find the number of peers in the config
+        make X = count + 2 and check that this address doesn't exist in the config then make it default.
+    */
+    printf("Input tunnel address (default 10.0.0.X/24): ");
+    for (i = 0; (c = getchar()) != '\n'; i++) {
+        ip[i] = c;
+    }
+
+    // add host ip to conf
+    res = add_key(conf, ADDRESS, ip);
+    if (res) {
+        printf("error: failed to add tunnel address.\n");
+        clear_config(conf);
+        return res;
+    }
+    printf("tunnel address: %s\n", ip);
+
+    return res;
+}
+
+/*
+copy contents of old <host_interface>.conf into new
+NOTE: caller must close returned file.
+*/
+FILE *file_copy(char *interface)
+{
+    FILE *old_file, *new_file;
+    Path *old_conf, *new_conf, *temp_conf;
+    char buffer[MAX_BUFFER];
+
+    old_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
+    sprintf(old_conf, ETC_WIREGUARD_CONF, interface);
+
+    temp_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 4);
+    sprintf(temp_conf, ETC_WIREGUARD_CONF".old", interface);
+
+    rename(old_conf, temp_conf);
+    remove(old_conf); 
+    free(old_conf);
+
+    old_file = fopen(temp_conf, "r");
+    if (!old_file) {
+        printf("error: unable to open old %s.conf\n", interface);
+        return NULL;
+    }
+
+    new_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
+    sprintf(new_conf, ETC_WIREGUARD_CONF, interface);
+
+    new_file = fopen(new_conf, "w");
+    if (!new_file) {
+        printf("error: unable to open old %s.conf", interface);
+        return NULL;
+    }
+    free(new_conf);
+
+    while (fgets(buffer, MAX_BUFFER, old_file)) {
+        fprintf(new_file, "%s", buffer);
+    }
+    fclose(old_file);
+
+    return new_file;
 }
 
 /*
@@ -144,7 +340,7 @@ int write_config(Config conf, Client client, char *host, char *peer)
             fclose(f);
 
             ip = conf->address;
-            // change subnet on AllowedIP in host
+            // change subnet mask on AllowedIP in host
             while (*ip && *ip++ != '/');
             if (!*ip) {
                 printf("error: incorrect address format.\n");
@@ -174,157 +370,6 @@ int write_config(Config conf, Client client, char *host, char *peer)
     free(p);
     
     return 0;
-}
-
-
-/*
-copy contents of old <host_interface>.conf into new
-NOTE: caller must close returned file.
-*/
-FILE *file_copy(char *interface)
-{
-    FILE *old_file, *new_file;
-    Path *old_conf, *new_conf, *temp_conf;
-    char buffer[MAX_BUFFER];
-
-    old_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
-    sprintf(old_conf, ETC_WIREGUARD_CONF, interface);
-
-    temp_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 4);
-    sprintf(temp_conf, ETC_WIREGUARD_CONF".old", interface);
-
-    rename(old_conf, temp_conf);
-    remove(old_conf); 
-    free(old_conf);
-
-    old_file = fopen(temp_conf, "r");
-    if (!old_file) {
-        printf("error: unable to open old %s.conf\n", interface);
-        return NULL;
-    }
-
-    new_conf = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
-    sprintf(new_conf, ETC_WIREGUARD_CONF, interface);
-
-    new_file = fopen(new_conf, "w");
-    if (!new_file) {
-        printf("error: unable to open old %s.conf", interface);
-        return NULL;
-    }
-    free(new_conf);
-
-    while (fgets(buffer, MAX_BUFFER, old_file)) {
-        fprintf(new_file, "%s", buffer);
-    }
-    fclose(old_file);
-
-    return new_file;
-}
-
-/*
-Read any key in the Field enum as long as it's in the config file.
-Client is the target config.
-reads from: HOST: /etc/wireguard/<interface>.conf.
-            PEER: ~/.config/wireman/<interface>/<interface>.conf.
-NOTE: caller must free returned pointer.
-*/
-char *read_key(char *interface, Client client, Field type) 
-{
-    Path *p;
-    char *buffer, *temp, *key = NULL, value[MAX_BUFFER];
-    int len;
-    register int i;
-
-    // initialize path
-    switch (client) {
-
-        case HOST:
-            p = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
-            sprintf(p, ETC_WIREGUARD_CONF, interface);
-            
-            break;
-
-        case PEER:
-            temp = config_path(interface);
-            if (is_dir(temp)) {
-                printf("error: %s not found.\n", temp);
-                free(temp);
-                return NULL;
-            }
-
-            p = mem_alloc(strlen(temp) + strlen(interface) + 7);
-            sprintf(p, "%s/%s.conf", temp, interface);
-            free(temp);
-
-            break;
-
-        default:
-            break;
-    }
-
-
-    switch (type) {
-
-        case ADDRESS:   key = mem_alloc(strlen("address") + 1);
-                        strcpy(key, "Address");
-                        break;
-        case KEY:       key = mem_alloc(strlen("privatekey") + 1);
-                        strcpy(key, "PrivateKey");
-                        break;
-        case PUB:       key = mem_alloc(strlen("publickey") + 1);
-                        strcpy(key, "PublicKey");
-                        break;
-        case PSK:       key = mem_alloc(strlen("presharedkey") + 1);
-                        strcpy(key, "PresharedKey");
-                        break;
-        case PORT:      key = mem_alloc(strlen("listeningport") + 1);
-                        strcpy(key, "ListeningPort");
-                        break;
-        case ALLOW:     key = mem_alloc(strlen("allowedips") + 1);
-                        strcpy(key, "AllowedIPs");
-                        break;
-        default:        printf("error: unkown key!\n");
-                        return NULL;
-    }
-
-    buffer = get_buffer(p);
-    free(p);
-    if (!buffer) {
-        return NULL;
-    }
-
-    temp = buffer;
-    len = strlen(key);
-    while (buffer++) {
-
-        for (i = 0; *buffer == key[i]; i++) {
-            if (*buffer != key[i]) {
-                break;
-            }
-            buffer++;
-        }
-
-        if (i == len) {
-            buffer += 3;        // increment " = ".
-
-            for (i = 0; *buffer != '\n'; i++) {
-            value[i] = *buffer++;
-            }
-            value[i] = '\0';
-
-            if (value) {
-                break;
-            } else {
-                buffer -= (len - 1);        // go back to char after intitial trigger.
-            }
-        }
-    }
-    free(temp);
-
-    temp = mem_alloc(strlen(value) + 1);
-    strcpy(temp, value);
-
-    return temp;
 }
 
 /*
@@ -485,37 +530,109 @@ int delete_interface(Client client, char *host, char *peer)
     return 0;
 }
 
+
 /*
-create a file ~/.conf/wireman/<key_name>.<key_type> 
-containing only key.
+Read any key in the Field enum as long as it's in the config file.
+Client is the target config.
+reads from: HOST: /etc/wireguard/<interface>.conf.
+            PEER: ~/.config/wireman/<interface>/<interface>.conf.
+NOTE: caller must free returned pointer.
 */
-int store_key(char *key_name, char *key_type, char *key)
+char *read_key(char *interface, Client client, Field type) 
 {
-    Path *p, *dir;
-    FILE *f;
+    Path *p;
+    char *buffer, *temp, *key = NULL, value[MAX_BUFFER];
+    int len;
+    register int i;
 
-    // check for ~/.config/wireman/<key_name>, create if doesn't exist.
-    dir = config_path(key_name);
-    if (!dir) {
-        return 1;
-    } else if (!is_dir(dir)) {
-        mkdir(dir, 0777);
+    // initialize path
+    switch (client) {
+
+        case HOST:
+            p = mem_alloc(strlen(ETC_WIREGUARD_CONF) + strlen(interface) + 1);
+            sprintf(p, ETC_WIREGUARD_CONF, interface);
+            
+            break;
+
+        case PEER:
+            temp = config_path(interface);
+            if (is_dir(temp)) {
+                printf("error: %s not found.\n", temp);
+                free(temp);
+                return NULL;
+            }
+
+            p = mem_alloc(strlen(temp) + strlen(interface) + 7);
+            sprintf(p, "%s/%s.conf", temp, interface);
+            free(temp);
+
+            break;
+
+        default:
+            break;
     }
 
-    // get absolute file path
-    p = mem_alloc(strlen(dir) + strlen(key_name) + strlen(key_type) + 3);
-    sprintf(p, "%s/%s.%s", dir, key_name, key_type);
-    free(dir);
 
-    // write base64
-    f = fopen(p, "w");
+    switch (type) {
+
+        case ADDRESS:   key = mem_alloc(strlen("address") + 1);
+                        strcpy(key, "Address");
+                        break;
+        case KEY:       key = mem_alloc(strlen("privatekey") + 1);
+                        strcpy(key, "PrivateKey");
+                        break;
+        case PUB:       key = mem_alloc(strlen("publickey") + 1);
+                        strcpy(key, "PublicKey");
+                        break;
+        case PSK:       key = mem_alloc(strlen("presharedkey") + 1);
+                        strcpy(key, "PresharedKey");
+                        break;
+        case PORT:      key = mem_alloc(strlen("listeningport") + 1);
+                        strcpy(key, "ListeningPort");
+                        break;
+        case ALLOW:     key = mem_alloc(strlen("allowedips") + 1);
+                        strcpy(key, "AllowedIPs");
+                        break;
+        default:        printf("error: unkown key!\n");
+                        return NULL;
+    }
+
+    buffer = get_buffer(p);
     free(p);
-    if (!f) {
-        printf("error: failed to create %s.%s\n", key_name, key_type);
-        return 1;
+    if (!buffer) {
+        return NULL;
     }
-    fprintf(f, "%s", key);
-    fclose(f);
 
-    return 0;
+    temp = buffer;
+    len = strlen(key);
+    while (buffer++) {
+
+        for (i = 0; *buffer == key[i]; i++) {
+            if (*buffer != key[i]) {
+                break;
+            }
+            buffer++;
+        }
+
+        if (i == len) {
+            buffer += 3;        // increment " = ".
+
+            for (i = 0; *buffer != '\n'; i++) {
+            value[i] = *buffer++;
+            }
+            value[i] = '\0';
+
+            if (value) {
+                break;
+            } else {
+                buffer -= (len - 1);        // go back to char after intitial trigger.
+            }
+        }
+    }
+    free(temp);
+
+    temp = mem_alloc(strlen(value) + 1);
+    strcpy(temp, value);
+
+    return temp;
 }

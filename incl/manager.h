@@ -2,9 +2,6 @@
 #define MANAGER_H
 
 #define MAX_BUFFER 512
-#define CONFIG_WIREMAN "/.config/wireman/"
-#define ETC_WIREGUARD "/etc/wireguard/"
-#define ETC_WIREGUARD_CONF "/etc/wireguard/%s.conf"
 
 /*
 Conf keys:  address (ipv4)
@@ -15,19 +12,21 @@ Conf keys:  address (ipv4)
             allow (ip)
 */
 typedef struct config *Config;
-typedef enum f {ADDRESS, KEY, PUB, PSK, PORT, ENDPOINT, ALLOW} Field;
-typedef enum {HOST, PEER} Client;
-//typedef enum {BASE64KEY, BASE64PUB, BASE64PSK} Key;
 typedef char Path;
 
+typedef enum f {ADDRESS, KEY, PUB, PSK, PORT, ENDPOINT, ALLOW} Field;
+typedef enum {HOST, PEER} Client;
+
+int config_home(void);
+char *config_path(char *dir);
 Config new_config(void);
 void clear_config(Config p);
 int write_config(Config conf, Client client, char *host, char *peer);
 int add_key(Config conf, Field key, char *s);
-int store_key(char *key_name, char *key_type, char *key);
-FILE *file_copy(char *interface);
 char *read_key(char *interface, Client client, Field type);
-//char *read_key(char *interface, Key type);
 int delete_interface(Client client, char *host, char *peer);
+int keygen(Config conf, char *interface);
+int tunnel_address(Config conf);
+
 
 #endif

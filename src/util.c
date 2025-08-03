@@ -8,39 +8,6 @@
 #include "../incl/util.h"
 #include "../incl/manager.h"
 
-Path *home, *wireman;
-
-int config_home(void)
-{
-    Path *p;
-
-    home = getenv("HOME");      // initialize global home path.
-    
-    p = mem_alloc(strlen(home) + 18);
-    strcpy(p, home);
-    wireman = strcat(p, CONFIG_WIREMAN);       // initialize global wireman path.
-
-    // create ~/.config/wireman if it doesn't exist.
-    if (!is_dir(wireman)) {
-        mkdir(wireman, 0777);
-    } 
-
-    return 0;
-}
-
-/*
-return the absolute path of the ~/.config/wireman/<dir> directory
-NOTE: free the pointer.
-*/
-char *config_path(char *dir) 
-{
-    Path *p;
-
-    p = mem_alloc(strlen(wireman) + strlen(dir) + 1);
-    sprintf(p, "%s%s", wireman, dir);
-
-    return p;
-}
 int is_dir(char *dir)
 {
     char *p;
