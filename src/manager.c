@@ -11,6 +11,7 @@
 #define CONFIG_WIREMAN "/.config/wireman/"
 #define ETC_WIREGUARD_CONF "/etc/wireguard/%s.conf"
 #define IP_LEN 15
+#define DEFAULT_ADDRESS "10.0.0.1/24"
 
 FILE *file_copy(char *interface);
 int store_key(char *key_name, char *key_type, char *key);
@@ -199,34 +200,81 @@ int store_key(char *key_name, char *key_type, char *key)
 
     return 0;
 }
-
-int tunnel_address(Config conf)
+/*
+    make defaults work with >100 peers?
+*/
+int tunnel_address(Config conf, Client client, char *host)
 {
-    int i, res;
-    char c, ip[IP_LEN + 1];     // TODO: find defaults.
+    Path *p;
+    int i, res, count;
+    char c, address[IP_LEN], *str, *temp;     // TODO: find defaults.
 
-    /*
-        if host interface doesn't exisit in /etc/wireguard/<interface>.conf, make default IP 10.0.0.1/24
+    switch (client) {
 
-        else,
+        case HOST:
+            strcpy(address, DEFAULT_ADDRESS);
+            break;
+        
+        case PEER:
+            p = config_wireguard(host);
+            if (!file_exists(p)) {
+                printf("error: interface %s not found.\n", host);
+            }
 
-        copy the host Address into a temp variable and find the number of peers in the config
-        make X = count + 2 and check that this address doesn't exist in the config then make it default.
-    */
+            temp = read_key(host, HOST, ADDRESS);
+            if (!temp) {
+                return 1;
+            }
+            strcpy(address, temp);
+            free(temp);
 
-    printf("Input tunnel address (default 10.0.0.X/24): ");
+            count = key_count(p, "[Peer]");
+            count += 2;
+            free(p);
+            
+            str = address;
+            while (*str != '/') {
+                str++;
+            }
+            while (*(str - 1) != '.') {
+                str--;
+            }
+
+            if (count < 10) {
+                *str = count + '0';
+            } else {        // only up to 99 for now
+                // move chars to the right.
+                while (*str) {
+                    str++;
+                }
+                while (*(str - 1) != '.') {
+                    *str = *(str - 1);
+                    str--;
+                }
+
+                *str++ = (count / 10) + '0';
+                *str = (count % 10) + '0';  
+            } 
+
+            break;
+        
+        default:
+            break;
+    }
+
+    printf("Input tunnel address (default %s): ", address);
     for (i = 0; (c = getchar()) != '\n'; i++) {
-        ip[i] = c;
+        address[i] = c;
     }
 
     // add host ip to conf
-    res = add_key(conf, ADDRESS, ip);
+    res = add_key(conf, ADDRESS, address);
     if (res) {
         printf("error: failed to add tunnel address.\n");
         clear_config(conf);
         return res;
     }
-    printf("tunnel address: %s\n", ip);
+    printf("tunnel address: %s\n", address);
 
     return res;
 }
@@ -532,13 +580,14 @@ int delete_interface(Client client, char *host, char *peer)
     return 0;
 }
 
-
 /*
 Read any key in the Field enum as long as it's in the config file.
 Client is the target config.
 reads from: HOST: /etc/wireguard/<interface>.conf.
             PEER: ~/.config/wireman/<interface>/<interface>.conf.
 NOTE: caller must free returned pointer.
+
+TODO: stop reading at [Peer] entry, if this was reached the correct key doesn't exist in the file.
 */
 char *read_key(char *interface, Client client, Field type) 
 {
@@ -552,12 +601,15 @@ char *read_key(char *interface, Client client, Field type)
 
         case HOST:
             p = config_wireguard(interface);
+            if (!p) {
+                printf("error: interface %s not found.\n", interface);
+            }
             break;
 
         case PEER:
             temp = config_wireman(interface);
             if (is_dir(temp)) {
-                printf("error: %s not found.\n", temp);
+                printf("error: peer %s not found.\n", temp);
                 free(temp);
                 return NULL;
             }
@@ -608,9 +660,6 @@ char *read_key(char *interface, Client client, Field type)
     while (buffer++) {
 
         for (i = 0; *buffer == key[i]; i++) {
-            if (*buffer != key[i]) {
-                break;
-            }
             buffer++;
         }
 
@@ -622,7 +671,7 @@ char *read_key(char *interface, Client client, Field type)
             }
             value[i] = '\0';
 
-            if (value) {
+            if (value[0] != '\0') {
                 break;
             } else {
                 buffer -= (len - 1);        // go back to char after intitial trigger.

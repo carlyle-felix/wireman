@@ -28,7 +28,7 @@ int add_host(char *host)
     }
     
     // get tunnel address
-    res = tunnel_address(conf);
+    res = tunnel_address(conf, HOST, host);
     if (res) {
         return res;
     }
@@ -67,7 +67,7 @@ int add_peer(char *host, char *peer)
     }
 
     // get tunnel address
-    res = tunnel_address(conf);
+    res = tunnel_address(conf, PEER, host);
     if (res) {
         return res;
     }

@@ -96,13 +96,13 @@ char *get_buffer(Path *p)
 
         buffer = realloc(buffer, max);
         if (!buffer) {
-            printf("error: failed to realloc buffer.\n");
+            printf("error: failed to realloc buffer in get_buffer().\n");
             return NULL;
         }
 
         f = fopen(p, "r");
         if (!f) {
-            printf("error: failed to pipe %s.\n", p);
+            printf("error: failed to pipe %s in get_buffer().\n", p);
             free(buffer);
             return NULL;
         }
@@ -135,4 +135,30 @@ void *mem_alloc(int bytes)
     }
 
     return temp;
+}
+
+int key_count(Path *p, char *key)
+{
+    char *buffer, *temp_buffer;
+    int i, len, count = 0;
+
+    buffer = get_buffer(p);
+    if (!buffer) {
+        return 1;
+    }
+
+    len = strlen(key);
+    temp_buffer = buffer;
+    while (*buffer++) {
+        
+        for (i = 0; *buffer == key[i]; i++) {
+            buffer++;
+        }
+        if (i == len) {
+            count++;
+        }
+    }
+    free(temp_buffer);
+
+    return count;
 }

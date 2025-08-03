@@ -26,7 +26,6 @@ int add_key(Config conf, Field key, char *s);
 char *read_key(char *interface, Client client, Field type);
 int delete_interface(Client client, char *host, char *peer);
 int keygen(Config conf, char *interface);
-int tunnel_address(Config conf);
-
+int tunnel_address(Config conf, Client client, char *host);
 
 #endif
