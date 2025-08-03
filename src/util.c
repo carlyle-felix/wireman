@@ -13,7 +13,7 @@ int is_dir(char *dir)
     char *p;
     DIR *d;
     
-    p = config_path(dir);
+    p = config_wireman(dir);
     if (!p) {
         return 1;
     }

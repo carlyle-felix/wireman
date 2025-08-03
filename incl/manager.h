@@ -18,7 +18,7 @@ typedef enum f {ADDRESS, KEY, PUB, PSK, PORT, ENDPOINT, ALLOW} Field;
 typedef enum {HOST, PEER} Client;
 
 int config_home(void);
-char *config_path(char *dir);
+char *config_wireman(char *dir);
 Config new_config(void);
 void clear_config(Config p);
 int write_config(Config conf, Client client, char *host, char *peer);

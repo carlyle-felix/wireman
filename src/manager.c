@@ -9,7 +9,6 @@
 #include "../incl/wireguard.h"
 
 #define CONFIG_WIREMAN "/.config/wireman/"
-#define ETC_WIREGUARD "/etc/wireguard/"
 #define ETC_WIREGUARD_CONF "/etc/wireguard/%s.conf"
 #define IP_LEN 15
 
@@ -50,7 +49,7 @@ int config_home(void)
 return the absolute path of the ~/.config/wireman/<dir> directory
 NOTE: free the pointer.
 */
-char *config_path(char *dir) 
+char *config_wireman(char *dir) 
 {
     Path *p;
 
@@ -172,7 +171,7 @@ int store_key(char *key_name, char *key_type, char *key)
     FILE *f;
 
     // check for ~/.config/wireman/<key_name>, create if doesn't exist.
-    dir = config_path(key_name);
+    dir = config_wireman(key_name);
     if (!dir) {
         return 1;
     } else if (!is_dir(dir)) {
@@ -210,6 +209,7 @@ int tunnel_address(Config conf)
         copy the host Address into a temp variable and find the number of peers in the config
         make X = count + 2 and check that this address doesn't exist in the config then make it default.
     */
+
     printf("Input tunnel address (default 10.0.0.X/24): ");
     for (i = 0; (c = getchar()) != '\n'; i++) {
         ip[i] = c;
@@ -306,7 +306,7 @@ int write_config(Config conf, Client client, char *host, char *peer)
             break;
         
         case PEER:
-            temp = config_path(peer);
+            temp = config_wireman(peer);
             if (!temp) {
                 return 1;
             }
@@ -401,7 +401,7 @@ int delete_interface(Client client, char *host, char *peer)
             free(wg);
 
             // recursively remove ~/.config/wireman/<interface> directory.
-            p = config_path(host);
+            p = config_wireman(host);
             if (!p) {
                 return 1;
             }
@@ -509,7 +509,7 @@ int delete_interface(Client client, char *host, char *peer)
             }
             
             // recursively remove ~/.config/wireman/<interface> directory.
-            p = config_path(peer);
+            p = config_wireman(peer);
             if (!p) {
                 return 1;
             }
@@ -555,7 +555,7 @@ char *read_key(char *interface, Client client, Field type)
             break;
 
         case PEER:
-            temp = config_path(interface);
+            temp = config_wireman(interface);
             if (is_dir(temp)) {
                 printf("error: %s not found.\n", temp);
                 free(temp);
